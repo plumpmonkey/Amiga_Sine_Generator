@@ -1,6 +1,6 @@
-# Sine Generator for 68000 Assembly
+# Amiga Sine Generator
 
-A Python-based tool to generate sine wave look-up tables (LUTs) for Motorola 68000 assembly projects. This is a port of the [original Rust implementation](https://github.com/rdoetjes/sine_generator) by rdoetjes, offering both a Command Line Interface (CLI) and a Graphical User Interface (GUI).
+A Python-based tool to generate sine wave look-up tables (LUTs) for Amiga programming. It supports output for **Motorola 68000 Assembly**, **C/C++**, and **Blitz Basic**. This is a port of the [original Rust implementation](https://github.com/rdoetjes/sine_generator), enhanced with a GUI and multi-language support.
 
 ![Sine Generator GUI](screenshot.png)
 
@@ -30,6 +30,7 @@ python sine_gen.py
 -   **ASM Label**: Set the label name for the table (e.g., `sine:`).
 -   **Points**: Slider to adjust the number of steps (0-255).
 -   **Amplitude**: Slider to adjust the magnitude (0-255).
+-   **Format**: Dropdown to select output format (**ASM**, **C**, **Blitz Basic**).
 -   **Visualization**: Green dots on a dark background show the waveform.
     -   *Note*: The visualization uses screen coordinates where positive values (down) correspond to increasing memory addresses/screen lines, matching typical copper list or sprite y-positioning logic.
 -   **Real-time Code**: The generated assembly code updates instantly in the text box.
@@ -49,6 +50,7 @@ python sine_gen.py --cli [options]
 -   `--label`: ASM label name (default: `sine`).
 -   `--points`: Number of points (default: `64`).
 -   `--amplitude`: Amplitude of the wave (default: `30`).
+-   `--format`: Output format: `asm` (default), `c`, `blitz`.
 -   `--output`: Output filename (optional). If omitted, prints to stdout.
 
 **Example:**
@@ -67,4 +69,23 @@ sine:
     dc.b 20, 22, 24, 26, 27, 28, 29, 30
     ...
 endsine:
+```
+
+**C/C++ Example:**
+
+```c
+signed char sine[] = {
+    0, 3, 5, 8, 11, 13, 16, 18,
+    20, 22, 24, 26, 27, 28, 29, 30
+    ...
+};
+```
+
+**Blitz Basic Example:**
+
+```blitzbasic
+.sine
+    Data.b 0, 3, 5, 8, 11, 13, 16, 18
+    Data.b 20, 22, 24, 26, 27, 28, 29, 30
+    ...
 ```

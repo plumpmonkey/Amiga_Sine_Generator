@@ -11,6 +11,8 @@ from tkinter import ttk, filedialog, messagebox
 
 
 
+# --- Logic ---
+
 def calculate_points(n_points, amplitude):
     points = []
     for i in range(n_points):
@@ -22,12 +24,11 @@ def calculate_points(n_points, amplitude):
         points.append(value)
     return points
 
-def generate_source(label, points):
+def generate_source_asm(label, points):
     lines = []
     lines.append(f"{label}:")
     
     current_line_parts = []
-    
     for i, p in enumerate(points):
         if i > 0 and i % 8 == 0:
             if current_line_parts:
@@ -38,13 +39,59 @@ def generate_source(label, points):
     if current_line_parts:
          lines.append(f"    dc.b {', '.join(current_line_parts)}")
 
-    lines.append(f"end{label}:")
+    lines.append(f"endsine:") # Fixed label usage elsewhere if needed, but endsine is legacy from original
+    # Actually, original code used f"end{label}:". Let's preserve that.
+    lines[-1] = f"end{label}:"
     
     return "\n".join(lines) + "\n"
 
-def generate_sine_table(label, n_points, amplitude):
+def generate_source_c(label, points):
+    lines = []
+    lines.append(f"signed char {label}[] = {{")
+    
+    current_line_parts = []
+    for i, p in enumerate(points):
+        if i > 0 and i % 8 == 0:
+            if current_line_parts:
+                lines.append(f"    {', '.join(current_line_parts)},")
+                current_line_parts = []
+        current_line_parts.append(str(p))
+    
+    if current_line_parts:
+         lines.append(f"    {', '.join(current_line_parts)}")
+
+    lines.append(f"}};")
+    return "\n".join(lines) + "\n"
+
+def generate_source_blitz(label, points):
+    lines = []
+    lines.append(f".{label}")
+    
+    current_line_parts = []
+    for i, p in enumerate(points):
+        if i > 0 and i % 8 == 0:
+            if current_line_parts:
+                lines.append(f"    Data.b {', '.join(current_line_parts)}")
+                current_line_parts = []
+        current_line_parts.append(str(p))
+    
+    if current_line_parts:
+         lines.append(f"    Data.b {', '.join(current_line_parts)}")
+
+    lines.append(f".end{label}")
+    return "\n".join(lines) + "\n"
+
+def generate_source(label, points, fmt="asm"):
+    if fmt == "c":
+        return generate_source_c(label, points)
+    elif fmt == "blitz":
+        return generate_source_blitz(label, points)
+    else:
+        return generate_source_asm(label, points)
+
+def generate_sine_table(label, n_points, amplitude, fmt="asm"):
     points = calculate_points(n_points, amplitude)
-    return generate_source(label, points)
+    return generate_source(label, points, fmt)
 
 # --- GUI ---
 
@@ -52,12 +99,13 @@ class SineApp:
     def __init__(self, root, args):
         self.root = root
         self.root.title("Sine Table Generator")
-        self.root.geometry("600x700")
+        self.root.geometry("600x750")
         
         # Variables
         self.label_var = tk.StringVar(value=args.label)
         self.points_var = tk.IntVar(value=args.points)
         self.amplitude_var = tk.IntVar(value=args.amplitude)
+        self.format_var = tk.StringVar(value=args.format)
         
         self.create_widgets()
         self.update_all()
@@ -67,27 +115,33 @@ class SineApp:
         controls_frame = ttk.LabelFrame(self.root, text="Settings", padding="10")
         controls_frame.pack(fill=tk.X, padx=10, pady=5)
         
-        # Row 1: Label
-        ttk.Label(controls_frame, text="ASM Label:").grid(row=0, column=0, sticky=tk.W)
+        # Row 0: Label
+        ttk.Label(controls_frame, text="Label:").grid(row=0, column=0, sticky=tk.W)
         ttk.Entry(controls_frame, textvariable=self.label_var).grid(row=0, column=1, sticky=tk.W, padx=5)
         
-        # Row 2: Points
+        # Row 1: Points
         ttk.Label(controls_frame, text="Points:").grid(row=1, column=0, sticky=tk.W)
         self.points_slider = ttk.Scale(controls_frame, from_=0, to=255, variable=self.points_var, orient=tk.HORIZONTAL, command=self.on_change)
         self.points_slider.grid(row=1, column=1, sticky=tk.EW, padx=5)
         self.points_label = ttk.Label(controls_frame, text=str(self.points_var.get()))
         self.points_label.grid(row=1, column=2, sticky=tk.W)
         
-        # Row 3: Amplitude
+        # Row 2: Amplitude
         ttk.Label(controls_frame, text="Amplitude:").grid(row=2, column=0, sticky=tk.W)
         self.amplitude_slider = ttk.Scale(controls_frame, from_=0, to=255, variable=self.amplitude_var, orient=tk.HORIZONTAL, command=self.on_change)
         self.amplitude_slider.grid(row=2, column=1, sticky=tk.EW, padx=5)
         self.amplitude_label = ttk.Label(controls_frame, text=str(self.amplitude_var.get()))
         self.amplitude_label.grid(row=2, column=2, sticky=tk.W)
 
+        # Row 3: Format
+        ttk.Label(controls_frame, text="Format:").grid(row=3, column=0, sticky=tk.W)
+        self.format_combo = ttk.Combobox(controls_frame, textvariable=self.format_var, values=["asm", "c", "blitz"], state="readonly")
+        self.format_combo.grid(row=3, column=1, sticky=tk.W, padx=5)
+        self.format_combo.bind("<<ComboboxSelected>>", lambda e: self.update_all())
+
         # Row 4: Execution Time
         self.time_label = ttk.Label(controls_frame, text="")
-        self.time_label.grid(row=3, column=0, columnspan=3, sticky=tk.W, pady=(5,0))
+        self.time_label.grid(row=4, column=0, columnspan=3, sticky=tk.W, pady=(5,0))
 
         controls_frame.columnconfigure(1, weight=1)
 
@@ -95,7 +149,7 @@ class SineApp:
         btn_frame = ttk.Frame(self.root, padding="10")
         btn_frame.pack(side=tk.BOTTOM, fill=tk.X)
         
-        self.save_btn = ttk.Button(btn_frame, text="Save .s file", command=self.save_file)
+        self.save_btn = ttk.Button(btn_frame, text="Save file", command=self.save_file)
         self.save_btn.pack(side=tk.RIGHT)
 
         # Plot Frame
@@ -129,6 +183,7 @@ class SineApp:
             points_count = self.points_var.get()
             amplitude = self.amplitude_var.get()
             label = self.label_var.get()
+            fmt = self.format_var.get()
             
             if points_count == 0:
                 self.text_area.delete(1.0, tk.END)
@@ -139,7 +194,7 @@ class SineApp:
             points = calculate_points(points_count, amplitude)
             
             # Update Code
-            code = generate_source(label, points)
+            code = generate_source(label, points, fmt)
             self.text_area.delete(1.0, tk.END)
             self.text_area.insert(tk.END, code)
             
@@ -152,7 +207,10 @@ class SineApp:
             self.time_label.config(text=f"{time_50hz:.4f} seconds at 50hz, {time_60hz:.4f} seconds at 60hz")
 
             # Update button text
-            self.save_btn.config(text=f"Save {label}.s")
+            ext = ".s"
+            if fmt == "c": ext = ".c"
+            if fmt == "blitz": ext = ".bb"
+            self.save_btn.config(text=f"Save {label}{ext}")
             
         except Exception as e:
             pass
@@ -193,8 +251,19 @@ class SineApp:
             prev_y = y
 
     def save_file(self):
-        filename = f"{self.label_var.get()}.s"
-        file_path = filedialog.asksaveasfilename(initialfile=filename, defaultextension=".s", filetypes=[("Assembly Source", "*.s"), ("All Files", "*.*")])
+        fmt = self.format_var.get()
+        ext = ".s"
+        filetypes = [("Assembly Source", "*.s"), ("All Files", "*.*")]
+        
+        if fmt == "c": 
+            ext = ".c"
+            filetypes = [("C Source", "*.c"), ("All Files", "*.*")]
+        elif fmt == "blitz":
+            ext = ".bb"
+            filetypes = [("Blitz Basic", "*.bb"), ("All Files", "*.*")]
+            
+        filename = f"{self.label_var.get()}{ext}"
+        file_path = filedialog.asksaveasfilename(initialfile=filename, defaultextension=ext, filetypes=filetypes)
         if file_path:
             try:
                 code = self.text_area.get(1.0, tk.END)
@@ -212,12 +281,13 @@ def main():
     parser.add_argument("--points", type=int, default=64, help="Number of points (default: 64)")
     parser.add_argument("--amplitude", type=int, default=30, help="Amplitude (default: 30)")
     parser.add_argument("--output", help="Output file (optional)")
+    parser.add_argument("--format", choices=["asm", "c", "blitz"], default="asm", help="Output format (asm, c, blitz). Default: asm")
     parser.add_argument("--cli", action="store_true", help="Run in Command Line Interface mode")
     
     args = parser.parse_args()
     
     if args.cli:
-        code = generate_sine_table(args.label, args.points, args.amplitude)
+        code = generate_sine_table(args.label, args.points, args.amplitude, args.format)
         
         if args.output:
             try:
