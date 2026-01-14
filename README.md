@@ -1,6 +1,6 @@
 # Amiga Sine Generator
 
-A Python-based tool to generate sine wave look-up tables (LUTs) for Amiga programming. It supports output for **Motorola 68000 Assembly**, **C/C++**, and **Blitz Basic**. This is a port of the [original Rust implementation](https://github.com/rdoetjes/sine_generator), enhanced with a GUI and multi-language support.
+A Python-based tool to generate sine wave look-up tables (LUTs) for Amiga programming. It supports output for **Motorola 68000 Assembly**, **C/C++**, and **Blitz Basic**. This is a port of the [original Rust implementation](https://github.com/rdoetjes/sine_generator), enhanced with a GUI, multi-language support, and **advanced waveform generation** (Modulation, Period Control).
 
 ![Sine Generator GUI](screenshot.png)
 
@@ -9,6 +9,7 @@ A Python-based tool to generate sine wave look-up tables (LUTs) for Amiga progra
 This tool calculates sine wave values and outputs them as `dc.b` (Define Constant Byte) directives, ready to be included in your Amiga or other 68k assembly source code. It handles:
 -   **Amplitude scaling**: Adjust the height of the wave.
 -   **Step count**: Define the resolution of the table (number of points per period).
+-   **Advanced Waveforms**: Generate full waves, half-waves (positive/negative), or add modulation (secondary sine wave).
 -   **Visual preview**: Real-time graphical view of the waveform (GUI only).
 -   **Execution time estimation**: Estimates the time per frame at 50Hz (PAL) and 60Hz (NTSC) based on the number of points.
 
@@ -31,6 +32,13 @@ python sine_gen.py
 -   **Points**: Slider to adjust the number of steps (0-255).
 -   **Amplitude**: Slider to adjust the magnitude (0-255).
 -   **Format**: Dropdown to select output format (**ASM**, **C**, **Blitz Basic**).
+-   **Period**: Dropdown to select generation mode:
+    -   **Full (360°)**: Standard full wave.
+    -   **Half (Positive)**: First 180° (0 to PI).
+    -   **Half (Negative)**: Second 180° (PI to 2PI).
+-   **Modulation**: Add a second sine wave on top of the primary one to create complex effects.
+    -   **Mod Amp**: Amplitude of the second wave.
+    -   **Mod Freq**: Frequency multiplier for the second wave.
 -   **Visualization**: Green dots on a dark background show the waveform.
     -   *Note*: The visualization uses screen coordinates where positive values (down) correspond to increasing memory addresses/screen lines, matching typical copper list or sprite y-positioning logic.
 -   **Real-time Code**: The generated assembly code updates instantly in the text box.
@@ -51,6 +59,9 @@ python sine_gen.py --cli [options]
 -   `--points`: Number of points (default: `64`).
 -   `--amplitude`: Amplitude of the wave (default: `30`).
 -   `--format`: Output format: `asm` (default), `c`, `blitz`.
+-   `--mod-amp`: Modulation amplitude (default: `0`).
+-   `--mod-freq`: Modulation frequency multiplier (default: `1`).
+-   `--period`: Generation period: `full` (default), `half`, `neg_half`.
 -   `--output`: Output filename (optional). If omitted, prints to stdout.
 
 **Example:**
