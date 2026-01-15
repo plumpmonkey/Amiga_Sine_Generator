@@ -56,8 +56,8 @@ python sine_gen.py --cli [options]
 **Arguments:**
 -   `--cli`: **Required** to run in CLI mode.
 -   `--label`: ASM label name (default: `sine`).
--   `--points`: Number of points (default: `64`).
--   `--amplitude`: Amplitude of the wave (default: `30`).
+-   `--points`: Number of points (default: `50`).
+-   `--amplitude`: Amplitude of the wave (default: `80`).
 -   `--format`: Output format: `asm` (default), `c`, `blitz`.
 -   `--mod-amp`: Modulation amplitude (default: `0`).
 -   `--mod-freq`: Modulation frequency multiplier (default: `1`).

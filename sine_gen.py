@@ -6,12 +6,15 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 
 # Function to calculate sine wave points based on parameters
-def calculate_points(n_points, amplitude, mod_amp=0, mod_freq=1, period_mode="full"):
+def calculate_points(n_points, amplitude, mod_amp=0, mod_freq=1, period_mode="full", offset=0):
     """
     Calculates a set of sine wave points based on the provided parameters.
 
     This function generates a series of points representing a sine wave, optionally
-    modulated by a second sine wave. The result is clamped to an 8-bit signed range.
+    modulated by a second sine wave. The result is clamped based on period mode:
+    - full: [-128, 127] (signed byte)
+    - half: [0, 255] (unsigned byte, positive wave)
+    - neg_half: [-255, 0] (negative wave)
 
     Args:
         n_points (int): The number of points to generate.
@@ -19,9 +22,10 @@ def calculate_points(n_points, amplitude, mod_amp=0, mod_freq=1, period_mode="fu
         mod_amp (int, optional): The amplitude of the modulation sine wave. Defaults to 0.
         mod_freq (int, optional): The frequency multiplier for the modulation wave. Defaults to 1.
         period_mode (str, optional): The period mode ("full", "half", "neg_half"). Defaults to "full".
+        offset (int, optional): Offset to shift the wave center. Defaults to 0.
 
     Returns:
-        list: A list of integer values representing the sine wave points, clamped to [-128, 127].
+        list: A list of integer values representing the sine wave points, clamped per mode.
     """
     # Initialize the list to hold the calculated points
     points = []
@@ -43,6 +47,17 @@ def calculate_points(n_points, amplitude, mod_amp=0, mod_freq=1, period_mode="fu
     # Calculate the total range of the angle
     angle_range = end_angle - start_angle
     
+    # Determine clamping range based on period mode
+    if period_mode == "half":
+        # Unsigned byte range for positive half-wave
+        clamp_min, clamp_max = 0, 255
+    elif period_mode == "neg_half":
+        # Negative range for negative half-wave
+        clamp_min, clamp_max = -255, 0
+    else:
+        # Signed byte range for full wave
+        clamp_min, clamp_max = -128, 127
+    
     # Loop through the number of points requested
     for i in range(n_points):
         # Map the current index i from 0..n_points to start_angle..end_angle
@@ -57,13 +72,13 @@ def calculate_points(n_points, amplitude, mod_amp=0, mod_freq=1, period_mode="fu
         # For simplicity and predictability in "half" modes, let's keep it relative to the angle being sampled.
         val2 = math.sin(angle * mod_freq) * mod_amp
         
-        # Combine the primary and modulation values
-        value_float = val1 + val2
+        # Combine the primary and modulation values, then add offset
+        value_float = val1 + val2 + offset
         # Convert the float result to an integer
         value = int(value_float)
         
-        # Clamp the value to the 8-bit signed integer range [-128, 127]
-        value = max(-128, min(127, value))
+        # Clamp the value to the appropriate range based on period mode
+        value = max(clamp_min, min(clamp_max, value))
         # Append the calculated value to the points list
         points.append(value)
         
@@ -197,7 +212,7 @@ def generate_source(label, points, fmt="asm"):
         return generate_source_asm(label, points)
 
 # Wrapper to calculate points and then generate source code
-def generate_sine_table(label, n_points, amplitude, mod_amp=0, mod_freq=1, period_mode="full", fmt="asm"):
+def generate_sine_table(label, n_points, amplitude, mod_amp=0, mod_freq=1, period_mode="full", fmt="asm", offset=0):
     """
     High-level function to generate the complete sine table source code.
 
@@ -209,12 +224,13 @@ def generate_sine_table(label, n_points, amplitude, mod_amp=0, mod_freq=1, perio
         mod_freq (int, optional): Modulation frequency.
         period_mode (str, optional): Period mode.
         fmt (str, optional): Output format.
+        offset (int, optional): Offset to shift wave center.
 
     Returns:
         str: The complete generated source code.
     """
     # First, calculate the raw data points
-    points = calculate_points(n_points, amplitude, mod_amp, mod_freq, period_mode)
+    points = calculate_points(n_points, amplitude, mod_amp, mod_freq, period_mode, offset)
     # Then generate and return the formatted source code
     return generate_source(label, points, fmt)
 
@@ -236,7 +252,7 @@ class SineApp:
         self.root = root
         # Set window title and size
         self.root.title("Amiga Sine Table Generator")
-        self.root.geometry("600x825")
+        self.root.geometry("600x835")
         
         # Try to set the window icon
         try:
@@ -255,6 +271,9 @@ class SineApp:
         # --- Advanced Variables ---
         self.mod_amp_var = tk.IntVar(value=args.mod_amp)
         self.mod_freq_var = tk.IntVar(value=args.mod_freq)
+        
+        # --- Offset Variable ---
+        self.offset_var = tk.IntVar(value=args.offset)
         
         # --- Map command line args to GUI period string ---
         p_val = "Full (360°)"
@@ -309,6 +328,13 @@ class SineApp:
         self.period_combo = ttk.Combobox(primary_frame, textvariable=self.period_var, values=["Full (360°)", "Half (Positive)", "Half (Negative)"], state="readonly")
         self.period_combo.grid(row=4, column=1, sticky=tk.W, padx=5)
         self.period_combo.bind("<<ComboboxSelected>>", lambda e: self.update_all())
+        
+        # Row 5: Offset Slider
+        ttk.Label(primary_frame, text="Offset:").grid(row=5, column=0, sticky=tk.W)
+        self.offset_slider = ttk.Scale(primary_frame, from_=-128, to=127, variable=self.offset_var, orient=tk.HORIZONTAL, command=self.on_change)
+        self.offset_slider.grid(row=5, column=1, sticky=tk.EW, padx=5)
+        self.offset_label = ttk.Label(primary_frame, text=str(self.offset_var.get()))
+        self.offset_label.grid(row=5, column=2, sticky=tk.W)
 
         # Allow the middle column to expand
         primary_frame.columnconfigure(1, weight=1)
@@ -380,6 +406,7 @@ class SineApp:
         self.amplitude_label.config(text=str(self.amplitude_var.get()))
         self.mod_amp_label.config(text=str(self.mod_amp_var.get()))
         self.mod_freq_label.config(text=str(self.mod_freq_var.get()))
+        self.offset_label.config(text=str(self.offset_var.get()))
         # Trigger full update
         self.update_all()
 
@@ -404,6 +431,9 @@ class SineApp:
             if "Positive" in p_gui: period_mode = "half"
             elif "Negative" in p_gui: period_mode = "neg_half"
             
+            # Get offset value
+            offset = self.offset_var.get()
+            
             # Handle empty points case to avoid errors
             if points_count == 0:
                 self.text_area.delete(1.0, tk.END)
@@ -411,7 +441,7 @@ class SineApp:
                 return
 
             # Calculate the points
-            points = calculate_points(points_count, amplitude, mod_amp, mod_freq, period_mode)
+            points = calculate_points(points_count, amplitude, mod_amp, mod_freq, period_mode, offset)
             
             # Generate the source code
             code = generate_source(label, points, fmt)
@@ -420,7 +450,7 @@ class SineApp:
             self.text_area.insert(tk.END, code)
             
             # Redraw the visualization plot
-            self.draw_plot(points, amplitude)
+            self.draw_plot(points, amplitude, period_mode)
             
             # Update estimated execution time strings (just for reference)
             time_50hz = points_count * 0.02
@@ -437,13 +467,14 @@ class SineApp:
             # Silently ignore errors during update (e.g. typing incomplete numbers)
             pass
 
-    def draw_plot(self, points, amplitude):
+    def draw_plot(self, points, amplitude, period_mode="full"):
         """
         Draws the visualization of the sine wave on the canvas.
 
         Args:
             points (list): The list of sine values.
-            amplitude (int): The amplitude (used for scaling/reference, though currently calc handles it).
+            amplitude (int): The amplitude (used for scaling/reference).
+            period_mode (str): The period mode to adjust visualization.
         """
         # Clear the canvas
         self.canvas.delete("all")
@@ -455,30 +486,48 @@ class SineApp:
         if w < 10: w = 550
         if h < 10: h = 200
 
-        # Calculate Vertical Center
-        center_y = h / 2
-        
         if not points:
             return
 
-        # Calculate scales for fitting points to canvas
+        # Calculate scales and baseline based on period mode
         x_step = w / len(points)
-        y_scale = (h / 2) / 130 # 130 is slightly more than max amp 127 + padding
-
-        prev_x = 0
-        prev_y = center_y + (points[0] * y_scale)
+        padding = 10  # Pixels padding from top/bottom edges
         
-        # Draw Center Guideline
-        self.canvas.create_line(0, center_y, w, center_y, fill="#555555", dash=(2, 4))
+        # All modes use sign = +1 for Amiga screen coords:
+        # Negative values go UP (smaller y/vpos), positive values go DOWN (larger y/vpos)
+        sign = 1
+        
+        if period_mode == "half":
+            # Half-positive: values 0-255, baseline at TOP
+            # Zero line at top, positive values go DOWN (Amiga screen coords)
+            baseline_y = padding
+            y_scale = (h - 2 * padding) / 260  # 260 gives slight headroom for 255
+            # Draw zero guideline at top
+            self.canvas.create_line(0, baseline_y, w, baseline_y, fill="#555555", dash=(2, 4))
+        elif period_mode == "neg_half":
+            # Half-negative: values -255 to 0, baseline at BOTTOM
+            # Zero line at bottom, negative values go UP (Amiga screen coords)
+            baseline_y = h - padding
+            y_scale = (h - 2 * padding) / 260
+            # Draw zero guideline at bottom
+            self.canvas.create_line(0, baseline_y, w, baseline_y, fill="#555555", dash=(2, 4))
+        else:
+            # Full wave: values -128 to 127, baseline at center
+            # Positive goes UP, negative goes DOWN
+            baseline_y = h / 2
+            y_scale = (h / 2 - padding) / 130  # 130 gives slight headroom for ±128
+            # Draw center guideline
+            self.canvas.create_line(0, baseline_y, w, baseline_y, fill="#555555", dash=(2, 4))
+
+        # Calculate first point position
+        prev_x = 0
+        prev_y = baseline_y + (sign * points[0] * y_scale)
 
         # Loop through points and draw lines connecting them
         for i in range(1, len(points)):
             x = i * x_step
-            # For Amiga/screen coords, positive Y is down, so we add. 
-            # (Note: Math sine is usually up for positive, but screen y is down. 
-            # If we want visual match to standard math plot we might subtract, 
-            # but usually for raw data viz we just map directly).
-            y = center_y + (points[i] * y_scale)
+            # Map value to y position
+            y = baseline_y + (sign * points[i] * y_scale)
             
             # Draw line segment
             self.canvas.create_line(prev_x, prev_y, x, y, fill="#00ff00", width=2)
@@ -528,13 +577,14 @@ def main():
     # Set up argument parser for CLI usage
     parser = argparse.ArgumentParser(description="Sine Generator for 68000 Assembly")
     parser.add_argument("--label", default="sine", help="ASM label name (default: sine)")
-    parser.add_argument("--points", type=int, default=64, help="Number of points (default: 64)")
-    parser.add_argument("--amplitude", type=int, default=30, help="Amplitude (default: 30)")
+    parser.add_argument("--points", type=int, default=50, help="Number of points (default: 50)")
+    parser.add_argument("--amplitude", type=int, default=80, help="Amplitude (default: 80)")
     parser.add_argument("--output", help="Output file (optional)")
     parser.add_argument("--format", choices=["asm", "c", "blitz"], default="asm", help="Output format (asm, c, blitz). Default: asm")
     parser.add_argument("--mod-amp", type=int, default=0, help="Modulation amplitude (default: 0)")
     parser.add_argument("--mod-freq", type=int, default=1, help="Modulation frequency (default: 1)")
     parser.add_argument("--period", choices=["full", "half", "neg_half"], default="full", help="Period mode: full, half, neg_half. Default: full")
+    parser.add_argument("--offset", type=int, default=0, help="Offset to shift wave center (default: 0)")
     parser.add_argument("--cli", action="store_true", help="Run in Command Line Interface mode")
     
     # Parse arguments
@@ -543,7 +593,7 @@ def main():
     # Check if CLI mode is requested
     if args.cli:
         # Generate code directly without GUI
-        code = generate_sine_table(args.label, args.points, args.amplitude, args.mod_amp, args.mod_freq, args.period, args.format)
+        code = generate_sine_table(args.label, args.points, args.amplitude, args.mod_amp, args.mod_freq, args.period, args.format, args.offset)
         
         # Output to file or stdout
         if args.output:
