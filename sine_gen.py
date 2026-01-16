@@ -169,8 +169,12 @@ def generate_source_blitz(label, points):
         str: The generated Blitz Basic code.
     """
     lines = []
-    # Blitz label starts with a dot
-    lines.append(f".{label}")
+    # Example blitz load 
+    lines.append(f"Dim List Sintab.w({len(points)})\n")
+    lines.append(f"Restore {label}\nFor i = 0 To {len(points)}\n\tRead Sintab(i)\n\tNPrint Sintab(i)\nNext\n")
+
+    # Blitz data tag
+    lines.append(f"{label}:")
     
     current_line_parts = []
     # Iterate through points
@@ -187,8 +191,6 @@ def generate_source_blitz(label, points):
     if current_line_parts:
          lines.append(f"    Data.b {', '.join(current_line_parts)}")
 
-    # Add end label
-    lines.append(f".end{label}")
     return "\n".join(lines) + "\n"
 
 # Dispatcher function to generate source based on format
