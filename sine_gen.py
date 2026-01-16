@@ -169,7 +169,7 @@ def generate_source_blitz(label, points):
         str: The generated Blitz Basic code.
     """
     lines = []
-    #example blitz load 
+    # Example blitz load 
     lines.append(f"Dim List Sintab.w({len(points)})\n")
     lines.append(f"Restore {label}\nFor i = 0 To {len(points)}\n\tRead Sintab(i)\n\tNPrint Sintab(i)\nNext\n")
 

@@ -20,13 +20,13 @@ Ensure you have Python 3.x installed. The tool uses standard libraries and `tkin
 
 On linux, you may need to install `tkinter` separately:
 
-debian based systems:
+Debian-based systems:
 
 ```bash
 sudo apt-get install python3-tk
 ```
 
-arch based systems:
+Arch-based systems:
 
 ```bash
 sudo pacman -S tk
